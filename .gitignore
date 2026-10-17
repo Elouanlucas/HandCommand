@@ -1,3 +1,15 @@
 venv/
 __pycache__/
 *.pyc
+
+# Ignorer tous les dossiers d'images et de visages
+images/
+Moi_IA/
+**/images/
+**/Moi_IA/
+
+# Ignorer tous les fichiers image directement
+*.jpg
+*.jpeg
+*.png
+encodings.pickle
