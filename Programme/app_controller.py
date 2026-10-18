@@ -2,6 +2,9 @@ import cv2
 import time
 from face_auth import authenticate_user
 from hand_detector import HandFingerCounter
+from choix_mode import gerer_choix_mode
+from mode_handler import gerer_action_du_mode, obtenir_aide_contexte  # <--- Importation de l'aide
+from hud_overlay import show_welcome_hud                             # <--- Pour afficher le HUD d'aide
 
 class HandCommandApp:
     def __init__(self, show_camera=True):
@@ -13,8 +16,13 @@ class HandCommandApp:
         self.current_mode = 0
         self.stable_fingers = -1
         self.hold_start_time = None
-        self.HOLD_DURATION = 2.0       # 2 secondes pour valider un mode (1 à 10)
-        self.RESET_DURATION = 1.0      # 1 seconde pour valider le retour à 0
+        self.HOLD_DURATION = 2.0        # 2 secondes pour valider un mode principal
+        self.RESET_DURATION = 1.0       # 1 seconde pour valider le retour à 0
+
+        # Variables pour les sous-actions dans un mode actif
+        self.ACTION_HOLD_DURATION = 1.0 # 1 seconde pour valider une action ou l'aide
+        self.action_stable_fingers = -1
+        self.action_hold_start_time = None
 
         # Sécurité globale (2 mains à 0 pendant 1.5s = fermeture complète)
         self.global_close_start_time = None
@@ -25,7 +33,7 @@ class HandCommandApp:
         
         # Étape 1 : Authentification faciale
         if authenticate_user(show_camera=self.show_camera):
-            print("[INFO] Authentification réussie ! Lancement du gestionnaire de modes...")
+            print("[INFO] Authentification réussie ! Lancement du gestionnaire...")
         else:
             print("[INFO] Authentification échouée ou annulée.")
             return
@@ -61,69 +69,157 @@ class HandCommandApp:
             else:
                 self.global_close_start_time = None
 
-            # --- LOGIQUE DE SÉLECTION DES MODES (0 à 10) ---
+            # --- LOGIQUE DE SÉLECTION DES MODES (Quand aucun mode n'est actif) ---
             if self.current_mode == 0:
                 if hands_detected > 0:
-                    if total_fingers == 0:
-                        self.stable_fingers = 0
+                    # SI ON MONTRE 10 DOIGTS DANS LE MENU PRINCIPAL : AFFICHER L'AIDE DES MODES (Maintien 1s)
+                    if total_fingers == 10:
+                        self.stable_fingers = -1
                         self.hold_start_time = None
-                        if self.show_camera:
-                            cv2.putText(image, "Montrez 1 a 10 doigts (Maintien 2s)", (50, 50), 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-                    elif 1 <= total_fingers <= 10:
-                        if total_fingers == self.stable_fingers:
-                            if self.hold_start_time is None:
-                                self.hold_start_time = current_time
-                            
-                            elapsed = current_time - self.hold_start_time
-                            time_left = max(0, round(self.HOLD_DURATION - elapsed, 1))
-                            
+                        
+                        if total_fingers == self.action_stable_fingers:
+                            if self.action_hold_start_time is None:
+                                self.action_hold_start_time = current_time
+
+                            elapsed_action = current_time - self.action_hold_start_time
+                            time_left_action = max(0, round(self.ACTION_HOLD_DURATION - elapsed_action, 1))
+
                             if self.show_camera:
-                                cv2.putText(image, f"Total: {total_fingers}... Restez {time_left}s", (50, 50), 
+                                cv2.putText(image, f"Affichage Aide... Maintenez {time_left_action}s", (50, 50), 
                                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-                            
-                            if elapsed >= self.HOLD_DURATION:
-                                self.current_mode = total_fingers
-                                self.stable_fingers = -1
-                                self.hold_start_time = None
-                                print(f"[INFO] Mode {self.current_mode} activé !")
+
+                            if elapsed_action >= self.ACTION_HOLD_DURATION:
+                                texte_aide = obtenir_aide_contexte(0)
+                                show_welcome_hud(texte_aide)
+                                self.action_stable_fingers = -1
+                                self.action_hold_start_time = None
                         else:
-                            self.stable_fingers = total_fingers
-                            self.hold_start_time = current_time
+                            self.action_stable_fingers = total_fingers
+                            self.action_hold_start_time = current_time
+
+                    else:
+                        # Réinitialisation du timer d'aide si on ne fait pas 10 doigts
+                        self.action_stable_fingers = -1
+                        self.action_hold_start_time = None
+
+                        if total_fingers == 0:
+                            self.stable_fingers = 0
+                            self.hold_start_time = None
+                            if self.show_camera:
+                                cv2.putText(image, "Montrez vos doigts (Maintien 2s)", (50, 50), 
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+                        elif 1 <= total_fingers <= 6:
+                            if total_fingers == self.stable_fingers:
+                                if self.hold_start_time is None:
+                                    self.hold_start_time = current_time
+                                
+                                elapsed = current_time - self.hold_start_time
+                                time_left = max(0, round(self.HOLD_DURATION - elapsed, 1))
+                                
+                                if self.show_camera:
+                                    cv2.putText(image, f"Mode {total_fingers}... Restez {time_left}s", (50, 50), 
+                                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                                
+                                if elapsed >= self.HOLD_DURATION:
+                                    self.current_mode = total_fingers
+                                    self.stable_fingers = -1
+                                    self.hold_start_time = None
+                                    print(f"[INFO] Mode {self.current_mode} validé !")
+                                    gerer_choix_mode(self.current_mode)
+                            else:
+                                self.stable_fingers = total_fingers
+                                self.hold_start_time = current_time
                 else:
                     if self.show_camera:
                         cv2.putText(image, "Montrez vos mains", (50, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                     self.stable_fingers = -1
                     self.hold_start_time = None
+
             else:
-                # Mode actif -> Vérification du retour à 0 pour quitter
-                if hands_detected > 0 and total_fingers == 0:
-                    if self.stable_fingers == 0:
-                        if self.hold_start_time is None:
+                # --- UN MODE EST ACTIF : GESTION DES SOUS-ACTIONS OU DE L'AIDE AVEC MAINTIEN DE 1s ---
+                if hands_detected > 0:
+                    # SI ON MONTRE 10 DOIGTS DANS UN MODE ACTIF : AFFICHER L'AIDE DU MODE (Maintien 1s)
+                    if total_fingers == 10:
+                        self.stable_fingers = -1
+                        self.hold_start_time = None
+
+                        if total_fingers == self.action_stable_fingers:
+                            if self.action_hold_start_time is None:
+                                self.action_hold_start_time = current_time
+
+                            elapsed_action = current_time - self.action_hold_start_time
+                            time_left_action = max(0, round(self.ACTION_HOLD_DURATION - elapsed_action, 1))
+
+                            if self.show_camera:
+                                cv2.putText(image, f"Affichage Aide... Maintenez {time_left_action}s", (50, 50), 
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+                            if elapsed_action >= self.ACTION_HOLD_DURATION:
+                                texte_aide = obtenir_aide_contexte(self.current_mode)
+                                show_welcome_hud(texte_aide)
+                                self.action_stable_fingers = -1
+                                self.action_hold_start_time = None
+                        else:
+                            self.action_stable_fingers = total_fingers
+                            self.action_hold_start_time = current_time
+
+                    # Si on montre des doigts entre 1 et 9 (Sous-actions normales)
+                    elif 1 <= total_fingers <= 9:
+                        self.stable_fingers = -1
+                        self.hold_start_time = None
+
+                        if total_fingers == self.action_stable_fingers:
+                            if self.action_hold_start_time is None:
+                                self.action_hold_start_time = current_time
+
+                            elapsed_action = current_time - self.action_hold_start_time
+                            time_left_action = max(0, round(self.ACTION_HOLD_DURATION - elapsed_action, 1))
+
+                            if self.show_camera:
+                                cv2.putText(image, f"Action {total_fingers}... Maintenez {time_left_action}s", (50, 50), 
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+                            if elapsed_action >= self.ACTION_HOLD_DURATION:
+                                gerer_action_du_mode(self.current_mode, total_fingers)
+                                self.action_stable_fingers = -1
+                                self.action_hold_start_time = None
+                        else:
+                            self.action_stable_fingers = total_fingers
+                            self.action_hold_start_time = current_time
+
+                    # Si on montre 0 doigts : Vérification du retour à 0 pour quitter le mode actif
+                    elif total_fingers == 0:
+                        self.action_stable_fingers = -1
+                        self.action_hold_start_time = None
+
+                        if self.stable_fingers == 0:
+                            if self.hold_start_time is None:
+                                self.hold_start_time = current_time
+                            
+                            elapsed = current_time - self.hold_start_time
+                            time_left = max(0, round(self.RESET_DURATION - elapsed, 1))
+                            
+                            if self.show_camera:
+                                msg = f"Quitter le mode dans {time_left}s..."
+                                text_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                                cv2.putText(image, msg, (w - text_size[0] - 20, h - 55), 
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                            
+                            if elapsed >= self.RESET_DURATION:
+                                self.current_mode = 0
+                                self.stable_fingers = -1
+                                self.hold_start_time = None
+                                print("[INFO] Mode réinitialisé (Retour à 0)")
+                                gerer_choix_mode(0)
+                        else:
+                            self.stable_fingers = 0
                             self.hold_start_time = current_time
-                        
-                        elapsed = current_time - self.hold_start_time
-                        time_left = max(0, round(self.RESET_DURATION - elapsed, 1))
-                        
-                        if self.show_camera:
-                            msg = f"Quitter le mode dans {time_left}s..."
-                            text_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-                            # Correction appliquée ici avec l'argument 'image'
-                            cv2.putText(image, msg, (w - text_size[0] - 20, h - 55), 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-                        
-                        if elapsed >= self.RESET_DURATION:
-                            self.current_mode = 0
-                            self.stable_fingers = -1
-                            self.hold_start_time = None
-                            print("[INFO] Mode réinitialisé (Retour à 0)")
-                    else:
-                        self.stable_fingers = 0
-                        self.hold_start_time = current_time
                 else:
                     self.stable_fingers = -1
                     self.hold_start_time = None
+                    self.action_stable_fingers = -1
+                    self.action_hold_start_time = None
 
             # --- AFFICHAGE DU MODE ACTIF EN BAS À DROITE ---
             if self.current_mode > 0:

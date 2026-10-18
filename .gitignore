@@ -13,3 +13,8 @@ Moi_IA/
 *.jpeg
 *.png
 encodings.pickle
+
+# Dossiers de compilation PyInstaller
+build/
+dist/
+*.spec
