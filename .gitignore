@@ -19,5 +19,6 @@ build/
 dist/
 *.spec
 
-#test
+# Dossiers de test et de brouillons
 test/
+**/test/
