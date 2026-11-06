@@ -39,40 +39,40 @@ def _run_action_logic(action_id):
         webbrowser.open("https://github.com")
 
     elif action_id == 4:
-        show_welcome_hud("Volume - 🔉")
         pyautogui.press('volumedown', presses=5)
+        show_welcome_hud("Volume - 🔉")
 
     elif action_id == 5:
-        show_welcome_hud("Volume + 🔊")
         pyautogui.press('volumeup', presses=5)
+        show_welcome_hud("Volume + 🔊")
 
-    elif action_id == 6:
-        show_welcome_hud("Diaporama : Suivant ➡️")
+    elif action_id == 6:  
         pyautogui.press('right')
+        show_welcome_hud("Diaporama : Suivant ➡️")
 
     elif action_id == 7:
-        show_welcome_hud("Diaporama : Précédent ⬅️")
         pyautogui.press('left')
+        show_welcome_hud("Diaporama : Précédent ⬅️")
 
     elif action_id == 8:
-        show_welcome_hud("YouTube : +10s ⏩")
         pyautogui.press('l')
+        show_welcome_hud("YouTube : +10s ⏩")
 
     elif action_id == 9:
-        show_welcome_hud("YouTube : -10s ⏪")
         pyautogui.press('j')
+        show_welcome_hud("YouTube : -10s ⏪")
 
     elif action_id == 10:
-        show_welcome_hud("YouTube : Pause / Lecture ⏯️")
         pyautogui.press('space')
+        show_welcome_hud("YouTube : Pause / Lecture ⏯️")
 
     elif action_id == 11:
-        show_welcome_hud("Ouverture Mails 🎓")
         webbrowser.open("https://mail.google.com/mail/")
+        show_welcome_hud("Ouverture Mails 🎓")
 
     elif action_id == 12:
-        show_welcome_hud("Ouverture École ESEO 🎓")
         webbrowser.open("https://reseaueseo.sharepoint.com/sites/etu/")
+        show_welcome_hud("Ouverture École ESEO 🎓")
 
     else:
         show_welcome_hud(f"Action {action_id} inconnue ⚠️")

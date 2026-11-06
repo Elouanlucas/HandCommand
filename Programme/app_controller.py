@@ -235,7 +235,7 @@ class HandCommandApp:
                 if cv2.waitKey(5) & 0xFF == 27:  # Échap pour quitter
                     break
             else:
-                cv2.waitKey(50)
+                cv2.waitKey(1)
 
         self.cap.release()
         self.detector.release()

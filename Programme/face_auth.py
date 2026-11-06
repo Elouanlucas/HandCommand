@@ -158,7 +158,7 @@ def authenticate_user(show_camera=False):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         else:
-            cv2.waitKey(50)
+            cv2.waitKey(1)
 
     cap.release()
     if show_camera:
